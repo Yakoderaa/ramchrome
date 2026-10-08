@@ -9,20 +9,21 @@ public sealed class MainForm : Form
 {
     const string RepoOwner = "Yakoderaa";
     const string Repo = "ramchrome";
-    const string CurrentVersion = "1.0.0";
+    const string CurrentVersion = "1.1.0";
 
     readonly Label chromeRam = new();
     readonly Label chromeProcesses = new();
     readonly Label status = new();
     readonly Button optimize = new();
     readonly Button update = new();
+    readonly Label saved = new();
     readonly ProgressBar progress = new();
     readonly System.Windows.Forms.Timer timer = new() { Interval = 2500 };
 
     public MainForm()
     {
         Text = $"RAMChrome {CurrentVersion}";
-        Width = 560; Height = 390;
+        Width = 560; Height = 430;
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 10);
         BackColor = Color.FromArgb(13,17,23);
@@ -37,10 +38,11 @@ public sealed class MainForm : Form
         AddMetric("Procesos de Chrome", chromeProcesses, 155);
 
         optimize.Text="Optimizar Chrome"; optimize.Location=new Point(30,210); optimize.Size=new Size(235,45); optimize.Click+=(_,_)=>Optimize(); Controls.Add(optimize);
+        saved.Text=""; saved.AutoSize=true; saved.ForeColor=Color.FromArgb(63,185,80); saved.Location=new Point(30,265); Controls.Add(saved);
         update.Text="Buscar actualización"; update.Location=new Point(285,210); update.Size=new Size(235,45); update.Click+=async(_,_)=>await CheckForUpdateAsync(true); Controls.Add(update);
 
-        progress.Location=new Point(30,270); progress.Size=new Size(490,18); progress.Visible=false; Controls.Add(progress);
-        status.Text="Comprobando versión al iniciar…"; status.ForeColor=Color.FromArgb(139,148,158); status.AutoSize=true; status.Location=new Point(30,310); Controls.Add(status);
+        progress.Location=new Point(30,300); progress.Size=new Size(490,18); progress.Visible=false; Controls.Add(progress);
+        status.Text="Comprobando versión al iniciar…"; status.ForeColor=Color.FromArgb(139,148,158); status.AutoSize=true; status.Location=new Point(30,340); Controls.Add(status);
 
         timer.Tick+=(_,_)=>RefreshStats(); timer.Start(); RefreshStats();
         Shown+=async(_,_)=>await CheckForUpdateAsync(false);
@@ -63,8 +65,56 @@ public sealed class MainForm : Form
 
     void Optimize()
     {
-        MessageBox.Show("La reducción segura de memoria de pestañas se realiza desde la extensión RAMChrome. Abrí el popup de RAMChrome en Chrome y pulsá «Optimizar ahora».", "RAMChrome", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        optimize.Enabled = false;
+        try
+        {
+            long before = GetChromeWorkingSet();
+            int trimmed = 0;
+            foreach (var p in Process.GetProcessesByName("chrome"))
+            {
+                try
+                {
+                    if (p.HasExited) continue;
+                    if (EmptyWorkingSet(p.Handle)) trimmed++;
+                }
+                catch { }
+                finally { p.Dispose(); }
+            }
+
+            Thread.Sleep(350);
+            long after = GetChromeWorkingSet();
+            long savedBytes = Math.Max(0, before - after);
+            saved.Text = $"Liberados del conjunto de trabajo: {FormatBytes(savedBytes)} · {trimmed} procesos";
+            status.Text = "Optimización completada. Chrome sigue abierto y las pestañas no se cerraron.";
+            RefreshStats();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "RAMChrome", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally { optimize.Enabled = true; }
     }
+
+    long GetChromeWorkingSet()
+    {
+        long total = 0;
+        foreach (var p in Process.GetProcessesByName("chrome"))
+        {
+            try { total += p.WorkingSet64; } catch { }
+            finally { p.Dispose(); }
+        }
+        return total;
+    }
+
+    static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024 * 1024) return $"{bytes / 1024d:0} KB";
+        if (bytes < 1024L * 1024 * 1024) return $"{bytes / 1024d / 1024d:0.0} MB";
+        return $"{bytes / 1024d / 1024d / 1024d:0.00} GB";
+    }
+
+    [System.Runtime.InteropServices.DllImport("psapi.dll", SetLastError = true)]
+    static extern bool EmptyWorkingSet(IntPtr hProcess);
 
     async Task CheckForUpdateAsync(bool manual)
     {
