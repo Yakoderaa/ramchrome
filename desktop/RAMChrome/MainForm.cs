@@ -7,7 +7,7 @@ namespace RAMChrome;
 
 public sealed class MainForm : Form
 {
-    const string Owner = "Yakoderaa";
+    const string RepoOwner = "Yakoderaa";
     const string Repo = "ramchrome";
     const string CurrentVersion = "1.0.0";
 
@@ -75,7 +75,7 @@ public sealed class MainForm : Form
             client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("RAMChrome",CurrentVersion));
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
 
-            var json=await client.GetStringAsync($"https://api.github.com/repos/{Owner}/{Repo}/releases/latest");
+            var json=await client.GetStringAsync($"https://api.github.com/repos/{RepoOwner}/{Repo}/releases/latest");
             var release=JsonSerializer.Deserialize<GitHubRelease>(json,new JsonSerializerOptions{PropertyNameCaseInsensitive=true});
             if(release is null||string.IsNullOrWhiteSpace(release.TagName)) throw new InvalidOperationException("GitHub no devolvió una release válida.");
 
