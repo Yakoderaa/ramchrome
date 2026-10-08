@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RAMChrome</title><link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<main>
+<header><div><h1>RAMChrome</h1><p>Optimizador de pestañas</p></div><span id="status">ACTIVO</span></header>
+<section class="card">
+<div class="row"><span>Pestañas abiertas</span><strong id="tabs">—</strong></div>
+<div class="row"><span>Pestañas suspendidas</span><strong id="discarded">—</strong></div>
+</section>
+<button id="optimize">Optimizar ahora</button>
+<section class="settings">
+<label>Suspender después de <select id="minutes">
+<option value="10">10 minutos</option><option value="20">20 minutos</option><option value="30">30 minutos</option><option value="60">1 hora</option>
+</select></label>
+<label class="toggle"><input id="enabled" type="checkbox" checked><span>Optimización automática</span></label>
+</section>
+<p id="message"></p>
+</main>
+<script src="popup.js"></script>
+</body>
+</html>
