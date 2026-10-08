@@ -10,10 +10,21 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
-      - name: Build
-        run: dotnet build desktop/RAMChrome/RAMChrome.csproj -c Release
-      - name: Build updater
-        run: dotnet build desktop/RAMChrome.Updater/RAMChrome.Updater.csproj -c Release
+
+      - name: Publish RAMChrome
+        run: dotnet publish desktop/RAMChrome/RAMChrome.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o artifacts/RAMChrome
+
+      - name: Publish updater
+        run: dotnet publish desktop/RAMChrome.Updater/RAMChrome.Updater.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o artifacts/RAMChrome
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: RAMChrome-win-x64
+          path: artifacts/RAMChrome/
+          if-no-files-found: error
+          retention-days: 30
