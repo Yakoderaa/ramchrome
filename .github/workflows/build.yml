@@ -1,0 +1,19 @@
+name: Build check
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build
+        run: dotnet build desktop/RAMChrome/RAMChrome.csproj -c Release
+      - name: Build updater
+        run: dotnet build desktop/RAMChrome.Updater/RAMChrome.Updater.csproj -c Release
