@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "RAMChrome",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Suspende de forma inteligente pestañas inactivas de Chrome para reducir el uso de RAM.",
   "permissions": ["tabs", "storage", "alarms"],
   "background": { "service_worker": "background.js" },
