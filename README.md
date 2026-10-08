@@ -3,7 +3,7 @@
 Optimizador ligero de memoria para Google Chrome en Windows.
 
 Componentes:
-- Chrome Extension: detecta pestañas inactivas y permite descartarlas para liberar memoria.
+- Chrome Extension: complemento opcional que descarta pestañas inactivas para liberar memoria de forma persistente.\n- El ejecutable de Windows funciona sin la extensión y puede ejecutar una optimización inmediata del conjunto de trabajo de Chrome.
 - RAMChrome Desktop: panel de Windows para medir Chrome, ejecutar optimizaciones y comprobar/instalar actualizaciones desde GitHub Releases.
 - Updater: pequeño ejecutable independiente que reemplaza la aplicación después de que esta se cierre.
 
