@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Microsoft.Win32;
 
 namespace RAMChrome;
 
@@ -9,7 +10,7 @@ public sealed class MainForm : Form
 {
     const string RepoOwner = "Yakoderaa";
     const string Repo = "ramchrome";
-    const string CurrentVersion = "1.1.0";
+    const string CurrentVersion = "1.2.0";
 
     readonly Label chromeRam = new();
     readonly Label chromeProcesses = new();
@@ -17,13 +18,19 @@ public sealed class MainForm : Form
     readonly Button optimize = new();
     readonly Button update = new();
     readonly Label saved = new();
+    readonly CheckBox autoOptimize = new();
+    readonly CheckBox startWithWindows = new();
+    readonly ComboBox interval = new();
+    readonly NotifyIcon tray = new();
+    readonly System.Windows.Forms.Timer autoTimer = new() { Interval = 120000 };
+    bool optimizing;
     readonly ProgressBar progress = new();
     readonly System.Windows.Forms.Timer timer = new() { Interval = 2500 };
 
     public MainForm()
     {
         Text = $"RAMChrome {CurrentVersion}";
-        Width = 560; Height = 430;
+        Width = 600; Height = 500;
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 10);
         BackColor = Color.FromArgb(13,17,23);
@@ -85,14 +92,14 @@ public sealed class MainForm : Form
             long after = GetChromeWorkingSet();
             long savedBytes = Math.Max(0, before - after);
             saved.Text = $"Liberados del conjunto de trabajo: {FormatBytes(savedBytes)} · {trimmed} procesos";
-            status.Text = "Optimización completada. Chrome sigue abierto y las pestañas no se cerraron.";
+            status.Text = (isAutomatic ? "Optimización automática completada." : "Optimización completada.") + " Chrome sigue abierto y las pestañas no se cerraron.";
             RefreshStats();
         }
         catch (Exception ex)
         {
             MessageBox.Show(ex.Message, "RAMChrome", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-        finally { optimize.Enabled = true; }
+        finally { optimize.Enabled = true; optimizing = false; }
     }
 
     long GetChromeWorkingSet()
@@ -116,7 +123,7 @@ public sealed class MainForm : Form
     [System.Runtime.InteropServices.DllImport("psapi.dll", SetLastError = true)]
     static extern bool EmptyWorkingSet(IntPtr hProcess);
 
-    async Task CheckForUpdateAsync(bool manual)
+    bool IsStartupEnabled()\n    {\n        try { using var key=Registry.CurrentUser.OpenSubKey(@"Software\\Microsoft\\Windows\\CurrentVersion\\Run",false); return key?.GetValue("RAMChrome") is string value && value.Contains("--tray",StringComparison.OrdinalIgnoreCase); } catch { return false; }\n    }\n\n    void SetStartup(bool enabled)\n    {\n        try { using var key=Registry.CurrentUser.OpenSubKey(@"Software\\Microsoft\\Windows\\CurrentVersion\\Run",true) ?? Registry.CurrentUser.CreateSubKey(@"Software\\Microsoft\\Windows\\CurrentVersion\\Run"); if(enabled) key.SetValue("RAMChrome", $"\\\"{Application.ExecutablePath}\\\" --tray"); else key.DeleteValue("RAMChrome",false); status.Text=enabled?"Se iniciará con Windows minimizado en la bandeja.":"Inicio automático desactivado."; }\n        catch(Exception ex) { MessageBox.Show("No se pudo cambiar el inicio automático: "+ex.Message,"RAMChrome",MessageBoxButtons.OK,MessageBoxIcon.Error); startWithWindows.Checked=!enabled; }\n    }\n\n    void HideToTray() { ShowInTaskbar=false; WindowState=FormWindowState.Minimized; Hide(); }\n    void RestoreFromTray() { Show(); ShowInTaskbar=true; WindowState=FormWindowState.Normal; Activate(); }\n    void ExitApplication() { tray.Visible=false; autoTimer.Stop(); timer.Stop(); Application.Exit(); }\n    protected override void OnResize(EventArgs e) { base.OnResize(e); if(WindowState==FormWindowState.Minimized) HideToTray(); }\n    protected override void OnFormClosing(FormClosingEventArgs e) { if(e.CloseReason==CloseReason.UserClosing) { e.Cancel=true; HideToTray(); } else base.OnFormClosing(e); }\n\n    async Task CheckForUpdateAsync(bool manual)
     {
         update.Enabled=false;
         try
