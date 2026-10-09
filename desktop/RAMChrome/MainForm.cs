@@ -10,16 +10,18 @@ public sealed class MainForm : Form
 {
     const string RepoOwner = "Yakoderaa";
     const string Repo = "ramchrome";
-    const string CurrentVersion = "1.2.0";
+    const string CurrentVersion = "1.3.0";
     readonly Label chromeRam = new(), chromeProcesses = new(), status = new(), saved = new();
-    readonly Button optimize = new(), update = new();
-    readonly CheckBox autoOptimize = new(), startWithWindows = new();
+    readonly Button optimize = new(), update = new(), automaticButton = new();
+    readonly CheckBox startWithWindows = new();
+    readonly Label automaticState = new();
     readonly ComboBox interval = new();
     readonly ProgressBar progress = new();
     readonly NotifyIcon tray = new();
     readonly System.Windows.Forms.Timer statsTimer = new() { Interval = 2500 };
     readonly System.Windows.Forms.Timer autoTimer = new() { Interval = 120000 };
-    bool optimizing, allowExit;
+    bool optimizing, allowExit, autoEnabled;
+    DateTime? lastAutomaticRun;
 
     public MainForm()
     {
@@ -32,16 +34,18 @@ public sealed class MainForm : Form
         optimize.Text="Optimizar ahora"; optimize.Location=new Point(30,210); optimize.Size=new Size(235,45); optimize.Click+=(_,_)=>Optimize(false); Controls.Add(optimize);
         update.Text="Buscar actualización"; update.Location=new Point(315,210); update.Size=new Size(235,45); update.Click+=async(_,_)=>await CheckForUpdateAsync(true); Controls.Add(update);
         saved.Text=""; saved.AutoSize=true; saved.ForeColor=Color.FromArgb(63,185,80); saved.Location=new Point(30,265); Controls.Add(saved);
-        autoOptimize.Text="Optimización automática cada"; autoOptimize.AutoSize=true; autoOptimize.Location=new Point(30,315); autoOptimize.Checked=true; autoOptimize.CheckedChanged+=(_,_)=>{autoTimer.Enabled=autoOptimize.Checked; status.Text=autoOptimize.Checked?"Optimización automática activada.":"Optimización automática pausada.";}; Controls.Add(autoOptimize);
-        interval.Location=new Point(285,311); interval.Size=new Size(110,28); interval.DropDownStyle=ComboBoxStyle.DropDownList; interval.Items.AddRange(new object[]{"1 minuto","2 minutos","5 minutos","10 minutos"}); interval.SelectedIndex=1;
-        interval.SelectedIndexChanged+=(_,_)=>autoTimer.Interval=interval.SelectedIndex switch {0=>60000,1=>120000,2=>300000,_=>600000}; Controls.Add(interval);
-        startWithWindows.Text="Iniciar con Windows y abrir minimizado en la bandeja"; startWithWindows.AutoSize=true; startWithWindows.Location=new Point(30,355);
+        automaticButton.Location=new Point(30,310); automaticButton.Size=new Size(235,40); automaticButton.Click+=(_,_)=>ToggleAutomaticMode(); Controls.Add(automaticButton);
+        automaticState.AutoSize=true; automaticState.Location=new Point(285,320); automaticState.ForeColor=Color.FromArgb(63,185,80); Controls.Add(automaticState);
+        interval.Location=new Point(30,360); interval.Size=new Size(150,28); interval.DropDownStyle=ComboBoxStyle.DropDownList; interval.Items.AddRange(new object[]{"1 minuto","2 minutos","5 minutos","10 minutos"});
+        interval.SelectedIndex=LoadSavedInterval(); autoTimer.Interval=GetIntervalMilliseconds(); interval.SelectedIndexChanged+=(_,_)=>{autoTimer.Interval=GetIntervalMilliseconds();SaveAutoSettings();UpdateAutomaticDisplay();}; Controls.Add(interval);
+        startWithWindows.Text="Iniciar con Windows y abrir minimizado en la bandeja"; startWithWindows.AutoSize=true; startWithWindows.Location=new Point(30,400);
         startWithWindows.Checked=IsStartupEnabled(); startWithWindows.CheckedChanged+=(_,_)=>SetStartup(startWithWindows.Checked); Controls.Add(startWithWindows);
-        progress.Location=new Point(30,395); progress.Size=new Size(520,18); progress.Visible=false; Controls.Add(progress);
-        status.Text="Preparado."; status.ForeColor=Color.FromArgb(139,148,158); status.AutoSize=true; status.Location=new Point(30,430); Controls.Add(status);
+        progress.Location=new Point(30,435); progress.Size=new Size(520,18); progress.Visible=false; Controls.Add(progress);
+        status.Text="Preparado."; status.ForeColor=Color.FromArgb(139,148,158); status.AutoSize=true; status.Location=new Point(30,465); Controls.Add(status);
         var menu=new ContextMenuStrip(); menu.Items.Add("Abrir RAMChrome",null,(_,_)=>RestoreFromTray()); menu.Items.Add("Optimizar ahora",null,(_,_)=>Optimize(false)); menu.Items.Add("Salir",null,(_,_)=>ExitApplication());
         tray.Icon=SystemIcons.Application; tray.Text="RAMChrome"; tray.ContextMenuStrip=menu; tray.DoubleClick+=(_,_)=>RestoreFromTray(); tray.Visible=true;
-        statsTimer.Tick+=(_,_)=>RefreshStats(); statsTimer.Start(); autoTimer.Tick+=(_,_)=>Optimize(true); autoTimer.Start(); RefreshStats();
+        autoEnabled=LoadSavedAutoEnabled(); UpdateAutomaticDisplay(); autoTimer.Tick+=(_,_)=>Optimize(true); autoTimer.Enabled=autoEnabled;
+        statsTimer.Tick+=(_,_)=>RefreshStats(); statsTimer.Start(); RefreshStats();
         Shown+=async(_,_)=>{if(Environment.GetCommandLineArgs().Contains("--tray"))HideToTray(); await CheckForUpdateAsync(false);};
     }
 
@@ -68,10 +72,45 @@ public sealed class MainForm : Form
             }
             Thread.Sleep(250); long after=GetChromeWorkingSet(); long freed=Math.Max(0,before-after);
             saved.Text=$"Liberados del conjunto de trabajo: {FormatBytes(freed)} · {trimmed} procesos";
-            status.Text=(automatic?"Optimización automática completada.":"Optimización manual completada.")+" Chrome sigue abierto.";
+            if(automatic) { lastAutomaticRun=DateTime.Now; status.Text="Prueba/ejecución automática completada correctamente. Chrome sigue abierto."; UpdateAutomaticDisplay(); }
+            else status.Text="Optimización manual completada. Chrome sigue abierto.";
             RefreshStats();
-        } catch(Exception ex) { status.Text="No se pudo completar la optimización."; if(!automatic)MessageBox.Show(ex.Message,"RAMChrome",MessageBoxButtons.OK,MessageBoxIcon.Error); }
+        } catch(Exception ex) { status.Text="No se pudo completar la optimización."; if(automatic) { automaticState.Text="AUTOMÁTICO ACTIVO · error"; automaticState.ForeColor=Color.FromArgb(248,81,73); } if(!automatic)MessageBox.Show(ex.Message,"RAMChrome",MessageBoxButtons.OK,MessageBoxIcon.Error); }
         finally { optimize.Enabled=true; optimizing=false; }
+    }
+
+    void ToggleAutomaticMode() {
+        autoEnabled=!autoEnabled;
+        autoTimer.Enabled=autoEnabled;
+        SaveAutoSettings();
+        UpdateAutomaticDisplay();
+        if(autoEnabled) {
+            status.Text="Modo automático activado. Ejecutando una prueba ahora…";
+            Optimize(true);
+        } else {
+            status.Text="Modo automático desactivado; no se harán optimizaciones periódicas.";
+        }
+    }
+    int GetIntervalMilliseconds() => interval.SelectedIndex switch { 0=>60000, 1=>120000, 2=>300000, _=>600000 };
+    void UpdateAutomaticDisplay() {
+        automaticButton.Text=autoEnabled?"Desactivar automático":"Establecer automático";
+        automaticState.ForeColor=autoEnabled?Color.FromArgb(63,185,80):Color.FromArgb(139,148,158);
+        automaticState.Text=autoEnabled
+            ? $"AUTOMÁTICO ACTIVO · cada {new[]{1,2,5,10}[Math.Clamp(interval.SelectedIndex,0,3)]} min"+(lastAutomaticRun.HasValue?$" · última: {lastAutomaticRun.Value:HH:mm:ss}":" · esperando primera ejecución")
+            : "AUTOMÁTICO DESACTIVADO";
+        tray.Text=autoEnabled?"RAMChrome · automático activo":"RAMChrome · automático desactivado";
+    }
+    bool LoadSavedAutoEnabled() {
+        try { using var key=Registry.CurrentUser.OpenSubKey(@"Software\RAMChrome",false); return key?.GetValue("AutoOptimize") is int value ? value==1 : true; }
+        catch { return true; }
+    }
+    int LoadSavedInterval() {
+        try { using var key=Registry.CurrentUser.OpenSubKey(@"Software\RAMChrome",false); int value=Convert.ToInt32(key?.GetValue("IntervalIndex")??1); return Math.Clamp(value,0,3); }
+        catch { return 1; }
+    }
+    void SaveAutoSettings() {
+        try { using var key=Registry.CurrentUser.CreateSubKey(@"Software\RAMChrome"); key.SetValue("AutoOptimize",autoEnabled?1:0,RegistryValueKind.DWord); key.SetValue("IntervalIndex",Math.Clamp(interval.SelectedIndex,0,3),RegistryValueKind.DWord); }
+        catch { status.Text="No se pudieron guardar los ajustes automáticos; se mantienen solo durante esta sesión."; }
     }
 
     long GetChromeWorkingSet() {
@@ -95,11 +134,20 @@ public sealed class MainForm : Form
             status.Text=enabled?"Se iniciará con Windows minimizado en la bandeja.":"Inicio automático desactivado.";
         } catch(Exception ex) { MessageBox.Show("No se pudo cambiar el inicio automático: "+ex.Message,"RAMChrome",MessageBoxButtons.OK,MessageBoxIcon.Error); startWithWindows.Checked=!enabled; }
     }
-    void HideToTray() { ShowInTaskbar=false; WindowState=FormWindowState.Minimized; Hide(); }
+    void HideToTray() {
+        if(!Visible) return;
+        ShowInTaskbar=false; WindowState=FormWindowState.Minimized; Hide();
+        tray.BalloonTipTitle="RAMChrome sigue funcionando";
+        tray.BalloonTipText=autoEnabled?"La ventana se ocultó en la bandeja. La optimización automática está activa.":"La ventana se ocultó en la bandeja. La optimización automática está desactivada.";
+        tray.ShowBalloonTip(1800);
+    }
     void RestoreFromTray() { Show(); ShowInTaskbar=true; WindowState=FormWindowState.Normal; Activate(); }
     void ExitApplication() { allowExit=true; tray.Visible=false; autoTimer.Stop(); statsTimer.Stop(); Close(); }
     protected override void OnResize(EventArgs e) { base.OnResize(e); if(WindowState==FormWindowState.Minimized)HideToTray(); }
-    protected override void OnFormClosing(FormClosingEventArgs e) { if(!allowExit && e.CloseReason==CloseReason.UserClosing){e.Cancel=true;HideToTray();} else {tray.Visible=false;base.OnFormClosing(e);} }
+    protected override void OnFormClosing(FormClosingEventArgs e) {
+        if(!allowExit && e.CloseReason==CloseReason.UserClosing) { e.Cancel=true; HideToTray(); }
+        else { tray.Visible=false; autoTimer.Stop(); statsTimer.Stop(); base.OnFormClosing(e); }
+    }
 
     async Task CheckForUpdateAsync(bool manual) {
         update.Enabled=false;
