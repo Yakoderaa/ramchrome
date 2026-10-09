@@ -26,7 +26,7 @@ public sealed class MainForm : Form
     public MainForm()
     {
         Text = $"RAMChrome {CurrentVersion}";
-        Width = 600; Height = 500; StartPosition = FormStartPosition.CenterScreen;
+        Width = 600; Height = 550; StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 10); BackColor = Color.FromArgb(13,17,23); ForeColor = Color.FromArgb(240,246,252);
         Controls.Add(new Label { Text="RAMChrome", Font=new Font("Segoe UI",22,FontStyle.Bold), AutoSize=true, Location=new Point(28,24) });
         Controls.Add(new Label { Text="Optimizador de memoria para Google Chrome", ForeColor=Color.FromArgb(139,148,158), AutoSize=true, Location=new Point(31,64) });
