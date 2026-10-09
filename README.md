@@ -1,17 +1,21 @@
-# RAMChrome
+# RAMChrome + RAMDiscord
 
-Optimizador ligero de memoria para Google Chrome en Windows.
+Utilidades ligeras para Windows que ayudan a reducir el conjunto de trabajo de memoria de Chrome y Discord.
 
-Componentes:
-- Chrome Extension: complemento opcional que descarta pestañas inactivas para liberar memoria de forma persistente.\n- El ejecutable de Windows funciona sin la extensión y puede ejecutar una optimización inmediata del conjunto de trabajo de Chrome.
-- RAMChrome Desktop: panel de Windows para medir Chrome, ejecutar optimizaciones y comprobar/instalar actualizaciones desde GitHub Releases.
-- Updater: pequeño ejecutable independiente que reemplaza la aplicación después de que esta se cierre.
+## RAMChrome
+- Complemento opcional para descartar pestañas inactivas.
+- Aplicación de Windows con optimización manual y periódica, estado visible, bandeja del sistema e inicio con Windows.
+- Actualización desde GitHub Releases con verificación SHA-256.
 
-Actualizaciones:
-La aplicación consulta el endpoint latest release de GitHub para detectar nuevas versiones, descarga el asset RAMChrome.zip, verifica su SHA-256 y ejecuta el updater para instalarlo.
+## RAMDiscord
+- Aplicación de Windows para medir procesos y memoria de Discord Stable, PTB y Canary.
+- Optimización manual y automática del conjunto de trabajo de los procesos detectados.
+- Botón **Establecer automático / Desactivar automático**, intervalo configurable, estado de última ejecución.
+- Cerrar con la X oculta la ventana en la bandeja; el menú permite abrir, optimizar o salir.
+- Opción para iniciar con Windows minimizado.
+- Actualizaciones desde releases con etiqueta `discord-v*`, verificadas mediante SHA-256.
 
-Desarrollo:
-Requiere .NET 8 SDK y Windows.
-- desktop/RAMChrome/RAMChrome.csproj
-- desktop/RAMChrome.Updater/RAMChrome.Updater.csproj
-- extension/
+**Nota:** estas aplicaciones no cierran Discord ni eliminan sus procesos. La optimización del conjunto de trabajo puede reducir la RAM física usada en ese momento, pero Windows o Discord pueden volver a cargar memoria; no equivale a una función oficial de descarga de pestañas ni garantiza una reducción permanente.
+
+## Desarrollo
+Requiere .NET 8 SDK y Windows. Los builds se publican como artefactos de GitHub Actions.
